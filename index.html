@@ -204,16 +204,30 @@ footer{ text-align:center; color:#55555f; font-size:11px; margin-top:30px; line-
       var auds = resources.filter(function(r){ return /audio|m4a|mp3/i.test(String(r.type || '')); });
       var ordered = vids.concat(auds);
       ordered.forEach(function(r, i){
+        var wrap = document.createElement('div');
+        wrap.style.cssText = 'display:flex;gap:8px;margin-top:10px';
         var btn = document.createElement('button');
         btn.className = 'btn ghost';
-        btn.style.cssText = 'margin-top:10px;font-size:14px;font-weight:600';
+        btn.style.cssText = 'margin-top:0;flex:3;font-size:14px;font-weight:600';
         var dur = r.duration ? ' · ' + Math.floor(r.duration / 60) + ':' + String(Math.floor(r.duration % 60)).padStart(2, '0') : '';
         btn.textContent = '⬇ ' + resLabel(r, i) + dur;
         btn.onclick = function(){
           var ext = /audio|m4a/i.test(String(r.type || '')) ? 'm4a' : 'mp4';
           downloadResource(r.url, fileName((d.title || 'youtube') + '_' + i, ext));
         };
-        resList.appendChild(btn);
+        var copyBtn = document.createElement('button');
+        copyBtn.className = 'btn ghost';
+        copyBtn.style.cssText = 'margin-top:0;flex:1;font-size:13px';
+        copyBtn.textContent = '🔗 复制直链';
+        copyBtn.onclick = function(){
+          var done = function(){ copyBtn.textContent = '✅ 已复制'; setTimeout(function(){ copyBtn.textContent = '🔗 复制直链'; }, 1500); };
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(r.url).then(done).catch(function(){ alert('复制失败'); });
+          } else { alert('当前浏览器不支持复制'); }
+        };
+        wrap.appendChild(btn);
+        wrap.appendChild(copyBtn);
+        resList.appendChild(wrap);
       });
       var tip = document.createElement('div');
       tip.className = 'hint';
