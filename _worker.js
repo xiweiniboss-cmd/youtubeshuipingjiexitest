@@ -246,6 +246,24 @@ async function handleParse(request, env) {
         await env.FEEDBACK_KV.put(gk, String(gc + 1));
       } catch {}
     }
+    // 最近解析记录（每站保留最近 20 条）
+    if (env.FEEDBACK_KV) {
+      try {
+        const cf2 = request.cf || {};
+        const hk = 'parsehist_youtube';
+        let hist = [];
+        try { hist = JSON.parse((await env.FEEDBACK_KV.get(hk)) || '[]'); } catch {}
+        if (!Array.isArray(hist)) hist = [];
+        hist.unshift({
+          t: Date.now(),
+          ip: parseIp,
+          cc: String(cf2.country || 'XX').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2) || 'XX',
+          region: cf2.region || '',
+          city: cf2.city || '',
+        });
+        await env.FEEDBACK_KV.put(hk, JSON.stringify(hist.slice(0, 20)));
+      } catch {}
+    }
     return json({ ok: true, ...result });
   } catch (e) {
     const body = { ok: false, error: e.message || '解析失败' };
@@ -604,6 +622,9 @@ h2{font-size:16px;margin:24px 0 12px;color:#f1f1f3}
 </div></div>
 <div class="panel" id="geoBars" style="margin-top:12px"></div>
 
+<h2>🕐 最近解析者</h2>
+<div class="panel" id="histList"><div style="color:#9a9aa3;font-size:13px;text-align:center">加载中…</div></div>
+
 <div class="refresh"><button onclick="load()">🔄 刷新</button></div>
 <div class="links"><a href="/admin?key=" id="adminLink">💬 反馈管理</a></div>
 </div><script>
@@ -633,7 +654,27 @@ async function load(){
     renderPie(sites, sum);
     renderBars(sites);
     loadGeo();
+    loadHistory();
   }catch(e){ grid.innerHTML = '<div class="err">网络错误</div>'; }
+}
+function escH(s){ return String(s || '').replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+async function loadHistory(){
+  const box = document.getElementById('histList');
+  try{
+    const r = await fetch('/api/parse-history?key=' + encodeURIComponent(key));
+    const j = await r.json();
+    if(!j.ok || !j.items || !j.items.length){ box.innerHTML = '<div style="color:#9a9aa3;font-size:13px;text-align:center">暂无数据（新解析才会记录）</div>'; return; }
+    box.innerHTML = '';
+    j.items.slice(0, 20).forEach(function(h){
+      const geo = [COUNTRY_ZH[h.cc] || h.cc || '', h.region || '', h.city || ''].filter(Boolean).join('·');
+      const time = new Date(h.t).toLocaleString('zh-CN', {hour12:false});
+      const row = document.createElement('div');
+      row.style.cssText = 'padding:10px 0;border-bottom:1px solid #2a2a34;line-height:1.8';
+      row.innerHTML = '<div style="font-size:14px"><b>' + escH(h.ip || '未知IP') + '</b>' + (geo ? ' <span style="color:#9a9aa3;font-size:13px">(' + escH(geo) + ')</span>' : '') + '</div>' +
+        '<div style="color:#9a9aa3;font-size:12px">' + escH(h.site) + ' · ' + escH(time) + '</div>';
+      box.appendChild(row);
+    });
+  }catch(e){ box.innerHTML = '<div style="color:#9a9aa3;font-size:13px;text-align:center">加载失败</div>'; }
 }
 async function loadGeo(){
   try{
@@ -708,6 +749,25 @@ function renderBars(sites){
 load();
 <\/script></body></html>`;
 
+
+
+async function handleParseHistory(request, env) {
+  const url = new URL(request.url);
+  if (!checkAdminKey(url, env)) return json({ ok: false, error: '无权访问' }, 403);
+  const siteNames = { tiktok: 'TikTok站', xhs: '小红书站', douyin: '抖音站', youtube: 'YouTube站' };
+  const all = [];
+  if (env.FEEDBACK_KV) {
+    for (const site of Object.keys(siteNames)) {
+      try {
+        const raw = await env.FEEDBACK_KV.get('parsehist_' + site);
+        const hist = raw ? JSON.parse(raw) : [];
+        if (Array.isArray(hist)) for (const h of hist) all.push({ site: siteNames[site], ...h });
+      } catch {}
+    }
+  }
+  all.sort((a, b) => (b.t || 0) - (a.t || 0));
+  return json({ ok: true, items: all.slice(0, 50) });
+}
 
 /* ================= 解析者归属地分布 ================= */
 async function handleGeoStats(request, env) {
@@ -792,6 +852,7 @@ export default {
     if (url.pathname.startsWith('/api/fb-file/')) return handleFeedbackFile(request, env);
     if (url.pathname === '/api/stats-all') return handleStatsAll(request, env);
     if (url.pathname === '/api/geo-stats') return handleGeoStats(request, env);
+    if (url.pathname === '/api/parse-history') return handleParseHistory(request, env);
     if (url.pathname === '/dashboard') {
       if (!checkAdminKey(url, env))
         return new Response('无权访问：在地址后加上 ?key=你的管理密码，例如 /dashboard?key=xxx', {
