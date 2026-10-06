@@ -398,9 +398,15 @@ footer{ text-align:center; color:#55555f; font-size:11px; margin-top:30px; line-
 
 // 每日解析配额显示
 function refreshQuota(){
-  fetch('/api/parse-quota').then(function(r){ return r.json(); }).then(function(j){
-    if (j.ok && typeof j.remaining === 'number') $('quotaCount').textContent = j.remaining;
-  }).catch(function(){});
+  var dbg = /[?&]qdebug=1/.test(location.search);
+  var el = document.getElementById('quotaCount');
+  if (dbg) alert('el found: ' + !!el + ', $ defined: ' + (typeof $));
+  fetch('/api/parse-quota').then(function(r){ return r.text(); }).then(function(t){
+    if (dbg) alert('raw: ' + t.slice(0,100));
+    var j = JSON.parse(t);
+    if (dbg) alert('ok=' + j.ok + ' rem=' + j.remaining + ' type=' + typeof j.remaining);
+    if (j.ok && typeof j.remaining === 'number') { el.textContent = j.remaining; if (dbg) alert('set to ' + j.remaining); }
+  }).catch(function(e){ if (dbg) alert('fail: ' + (e && e.message)); });
 }
 refreshQuota();
 </script>
