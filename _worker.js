@@ -244,6 +244,44 @@ async function handleParse(request, env) {
   }
 }
 
+// ---------- YouTube 直链下载代理 ----------
+// googlevideo 不发送 CORS 头，手机端 fetch 会被拦；由 Worker 中转后加 CORS 头返回
+async function handleYtDl(request) {
+  const u = new URL(request.url);
+  const mediaUrl = u.searchParams.get('url') || '';
+  const filename = (u.searchParams.get('filename') || 'youtube_video.mp4').replace(/["\r\n]/g, '').slice(0, 80) || 'youtube_video.mp4';
+  let target = null;
+  try { target = new URL(mediaUrl); } catch {
+    return json({ ok: false, error: '无效的下载地址' }, 400);
+  }
+  // 仅允许 googlevideo / youtube 媒体域名
+  const allowed = /(^|\.)googlevideo\.com$|(^|\.)youtube\.com$|(^|\.)youtu\.be$|(^|\.)ytimg\.com$/i;
+  if (!/^https:$/.test(target.protocol) || !allowed.test(target.hostname))
+    return json({ ok: false, error: '不支持的下载地址' }, 400);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 120000);
+  try {
+    const resp = await fetch(mediaUrl, {
+      headers: { 'User-Agent': UA_PC, Accept: '*/*' },
+      signal: ctrl.signal,
+    });
+    if (!resp.ok || !resp.body)
+      return json({ ok: false, error: '下载失败（HTTP ' + resp.status + '）' }, 502);
+    const h = new Headers();
+    h.set('Content-Type', resp.headers.get('content-type') || 'application/octet-stream');
+    const len = resp.headers.get('content-length');
+    if (len) h.set('Content-Length', len);
+    h.set('Content-Disposition', 'attachment; filename="' + filename + '"');
+    h.set('Cache-Control', 'no-store');
+    h.set('Access-Control-Allow-Origin', '*');
+    return new Response(resp.body, { status: 200, headers: h });
+  } catch (e) {
+    return json({ ok: false, error: '下载失败：' + (e.message || '网络错误') }, 502);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /* ================= 反馈系统（KV 存储 + 管理后台，与小红书/TikTok/抖音站共用） ================= */
 async function handleFeedbackSubmit(request, env) {
   if (!env.FEEDBACK_KV) return json({ ok: false, error: '反馈功能暂未启用' }, 500);
@@ -622,6 +660,7 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === '/api/parse') return handleParse(request, env);
+    if (url.pathname === '/api/ytdl') return handleYtDl(request);
 
     if (url.pathname === '/api/diag')
       return json({

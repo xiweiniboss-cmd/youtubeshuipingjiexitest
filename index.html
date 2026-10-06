@@ -146,10 +146,11 @@ footer{ text-align:center; color:#55555f; font-size:11px; margin-top:30px; line-
   }
   function resetParseBtn(){ setParseBtn('开始解析', false); }
 
-  // 下载单个资源：手机直接请求直链（需开 VPN），成功则经系统分享保存（iPhone 弹出菜单）
+  // 下载单个资源：经 /api/ytdl 代理中转（googlevideo 无 CORS 头，手机直接 fetch 会被拦），成功则经系统分享保存
   function downloadResource(url, filename){
     setParseBtn('正在准备下载…', true);
-    fetch(url, { referrerPolicy: 'no-referrer' }).then(function(res){
+    var proxyUrl = '/api/ytdl?url=' + encodeURIComponent(url) + '&filename=' + encodeURIComponent(filename);
+    fetch(proxyUrl).then(function(res){
       if(!res.ok) throw new Error('HTTP ' + res.status);
       return res.blob();
     }).then(function(blob){
@@ -167,7 +168,7 @@ footer{ text-align:center; color:#55555f; font-size:11px; margin-top:30px; line-
     }).catch(function(e){
       resetParseBtn();
       showError('下载失败：' + (e.message || '网络错误') +
-        '<br><br>💡 YouTube 直链需要境外网络，请确认 VPN 已开启（建议美国节点）。<br>💡 直链有时效，超时请重新解析。');
+        '<br><br>💡 可点右侧「🔗 复制直链」粘贴到 Safari 直接打开播放。<br>💡 直链有时效，超时请重新解析。');
     });
   }
 
