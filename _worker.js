@@ -277,6 +277,7 @@ async function handleParse(request, env) {
         hist.unshift({
           t: Date.now(),
           ip: parseIp,
+          dev: deviceId || '',
           cc: String(cf2.country || 'XX').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2) || 'XX',
           region: cf2.region || '',
           city: cf2.city || '',
@@ -690,8 +691,9 @@ async function loadHistory(){
       const time = new Date(h.t).toLocaleString('zh-CN', {hour12:false});
       const row = document.createElement('div');
       row.style.cssText = 'padding:10px 0;border-bottom:1px solid #2a2a34;line-height:1.8';
+      const dev = h.dev ? escH(String(h.dev).slice(0, 16)) : '';
       row.innerHTML = '<div style="font-size:14px"><b>' + escH(h.ip || '未知IP') + '</b>' + (geo ? ' <span style="color:#9a9aa3;font-size:13px">(' + escH(geo) + ')</span>' : '') + '</div>' +
-        '<div style="color:#9a9aa3;font-size:12px">' + escH(h.site) + ' · ' + escH(time) + '</div>';
+        '<div style="color:#9a9aa3;font-size:12px">' + escH(h.site) + ' · ' + escH(time) + (dev ? ' · <span style="color:#7a7a85">设备:' + dev + '</span>' : '') + '</div>';
       box.appendChild(row);
     });
   }catch(e){ box.innerHTML = '<div style="color:#9a9aa3;font-size:13px;text-align:center">加载失败</div>'; }
