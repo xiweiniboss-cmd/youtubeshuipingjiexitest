@@ -223,10 +223,13 @@ async function handleParse(request, env) {
     }
   }
 
-  // 每日解析限额：同一 IP 每天最多 20 次（防刷 API 烧积分），按北京时间算天
+  // 每日解析限额：同一设备每天最多 20 次（防换 IP 刷 API 烧积分），按北京时间算天
   const DAILY_LIMIT = 20;
   const bjDate = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
-  const quotaKey = 'dlimit_' + parseIp + '_' + bjDate;
+  const parseUrl = new URL(request.url);
+  const deviceId = parseUrl.searchParams.get('deviceId') || '';
+  const quotaId = deviceId || parseIp;
+  const quotaKey = 'dlimit_' + quotaId + '_' + bjDate;
   let usedToday = 0;
   if (parseIp && env.FEEDBACK_KV) {
     try { usedToday = Number((await env.FEEDBACK_KV.get(quotaKey)) || 0); } catch {}
@@ -813,11 +816,14 @@ async function handleGeoStats(request, env) {
 /* ================= 每日解析配额 ================= */
 async function handleParseQuota(request, env) {
   const DAILY_LIMIT = 20;
+  const url = new URL(request.url);
   const ip = request.headers.get('cf-connecting-ip') || '';
+  const deviceId = url.searchParams.get('deviceId') || '';
+  const quotaId = deviceId || ip;
   const bjDate = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
   let used = 0;
-  if (ip && env.FEEDBACK_KV) {
-    try { used = Number((await env.FEEDBACK_KV.get('dlimit_' + ip + '_' + bjDate)) || 0); } catch {}
+  if (quotaId && env.FEEDBACK_KV) {
+    try { used = Number((await env.FEEDBACK_KV.get('dlimit_' + quotaId + '_' + bjDate)) || 0); } catch {}
   }
   return json({ ok: true, limit: DAILY_LIMIT, used, remaining: Math.max(0, DAILY_LIMIT - used) });
 }
