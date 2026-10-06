@@ -413,9 +413,14 @@ var deviceId = (function(){
 function refreshQuota(){
   var el = document.getElementById('quotaCount');
   if (!el) return;
-  fetch('/api/parse-quota?deviceId=' + encodeURIComponent(deviceId)).then(function(r){ return r.json(); }).then(function(j){
+  var dbg = /[?&]qdebug=1/.test(location.search);
+  var qurl = '/api/parse-quota?deviceId=' + encodeURIComponent(deviceId);
+  if (dbg) alert('fetching: ' + qurl);
+  fetch(qurl).then(function(r){ return r.text(); }).then(function(t){
+    if (dbg) alert('got: ' + t.slice(0,120));
+    var j = JSON.parse(t);
     if (j && j.ok && typeof j.remaining === 'number') el.textContent = j.remaining;
-  }).catch(function(){});
+  }).catch(function(e){ if (dbg) alert('quota err: ' + (e && e.message)); });
 }
 refreshQuota();
 </script>
