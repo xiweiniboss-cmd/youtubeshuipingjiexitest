@@ -484,7 +484,7 @@ async function load() {
       const d = document.createElement('div');
       d.className = 'fb';
       const t = new Date(it.time).toLocaleString('zh-CN', { hour12: false });
-      d.innerHTML = '<div class="meta"><span class="site">[' + esc(siteName(it.page)) + ']</span> ' + esc(t) + (it.contact ? ' · ' + esc(it.contact) : '') + '</div>' +
+      d.innerHTML = '<div class="meta"><span class="site">[' + esc(siteName(it.page)) + ']</span> ' + esc(t) + (it.contact ? ' · ' + esc(it.contact) : '') + (it.ip ? ' · IP: ' + esc(it.ip) : '') + '</div>' +
         '<div class="msg">' + esc(it.message) + '</div>';
       const copyBtn = document.createElement('button');
       copyBtn.textContent = '📋 复制文本';
