@@ -446,6 +446,17 @@ async function load() {
       const t = new Date(it.time).toLocaleString('zh-CN', { hour12: false });
       d.innerHTML = '<div class="meta"><span class="site">[' + esc(siteName(it.page)) + ']</span> ' + esc(t) + (it.contact ? ' · ' + esc(it.contact) : '') + '</div>' +
         '<div class="msg">' + esc(it.message) + '</div>';
+      const copyBtn = document.createElement('button');
+      copyBtn.textContent = '📋 复制文本';
+      copyBtn.style.cssText = 'margin-top:8px;background:#f0f0f2;border:none;border-radius:8px;padding:8px 16px;font-size:13px;color:#333;cursor:pointer';
+      copyBtn.onclick = function(){
+        const txt = it.message || '';
+        const done = function(){ copyBtn.textContent = '✅ 已复制'; setTimeout(function(){ copyBtn.textContent = '📋 复制文本'; }, 1500); };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(txt).then(done).catch(function(){ alert('复制失败'); });
+        } else { alert('当前浏览器不支持一键复制'); }
+      };
+      d.appendChild(copyBtn);
       if (it.attachments && it.attachments.length) {
         const att = document.createElement('div');
         for (const a of it.attachments) {
