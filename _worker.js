@@ -450,11 +450,13 @@ async function load() {
         const att = document.createElement('div');
         for (const a of it.attachments) {
           const src = '/api/fb-file/' + encodeURIComponent(a.key) + '?key=' + encodeURIComponent(key);
+          const fname = esc(String(a.name || 'attachment'));
           if (String(a.type || '').startsWith('image/')) {
             att.innerHTML += '<img src="' + src + '" style="max-width:100%;border-radius:8px;margin-top:8px;display:block" loading="lazy">';
           } else {
             att.innerHTML += '<video src="' + src + '" controls playsinline style="max-width:100%;border-radius:8px;margin-top:8px;display:block"></video>';
           }
+          att.innerHTML += '<a href="' + src + '" download="' + fname + '" style="display:inline-block;margin-top:6px;background:#f0f0f2;border-radius:8px;padding:8px 16px;font-size:13px;color:#333;text-decoration:none">⬇ 下载</a>';
         }
         d.appendChild(att);
       }
