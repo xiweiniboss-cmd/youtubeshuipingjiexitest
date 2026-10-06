@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>YouTube 无水印解析下载</title>
+<style>
+:root{ --pink:#FF0000; --cyan:#25F4EE; --bg:#0f0f13; --card:#1a1a21; --text:#f1f1f3; --muted:#9a9aa3; }
+*{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body{ margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; }
+.wrap{ max-width:640px; margin:0 auto; padding:20px 16px 60px; }
+header{ text-align:center; margin:26px 0 20px; }
+header h1{ font-size:26px; margin:0 0 8px; font-weight:800; letter-spacing:1px; }
+header h1 .dy{ color:var(--text); text-shadow:2px 2px 0 var(--pink), -2px -2px 0 #fff; }
+header h1 .dl{ color:var(--pink); }
+header p{ color:var(--muted); font-size:13px; margin:0; }
+.card{ background:var(--card); border-radius:16px; padding:18px 16px; margin-top:16px; box-shadow:0 4px 20px rgba(0,0,0,.35); }
+textarea{ width:100%; min-height:88px; background:#101016; border:1px solid #2c2c36; border-radius:12px; color:var(--text); font-size:14px; padding:12px; resize:vertical; outline:none; }
+textarea:focus{ border-color:var(--pink); }
+.btn{ display:block; width:100%; margin-top:12px; padding:14px; border:none; border-radius:12px; font-size:16px; font-weight:700; color:#fff; background:linear-gradient(135deg,var(--pink),#ff6b4a); cursor:pointer; }
+.btn:disabled{ opacity:.55; }
+.btn.ghost{ background:#2a2a34; margin-top:10px; font-size:14px; font-weight:500; }
+.hint{ font-size:12px; color:var(--muted); margin-top:10px; line-height:1.8; }
+#result{ display:none; }
+video#preview{ width:100%; max-height:60vh; border-radius:12px; background:#000; }
+.title{ font-size:14px; line-height:1.6; margin:10px 0 12px; word-break:break-word; }
+.grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:12px; }
+.grid img{ width:100%; aspect-ratio:3/4; object-fit:cover; border-radius:8px; background:#101016; }
+.err{ display:none; background:rgba(254,44,85,.12); border:1px solid rgba(254,44,85,.4); color:#ff8ba0; font-size:13px; border-radius:12px; padding:12px; margin-top:14px; line-height:1.7; word-break:break-word; }
+.loading{ display:none; text-align:center; color:var(--muted); font-size:13px; margin-top:14px; }
+/* 反馈浮钮 + 底部弹窗 */
+#fbBtn{ position:fixed; right:18px; bottom:calc(22px + env(safe-area-inset-bottom)); width:52px; height:52px;
+        border-radius:50%; border:none; font-size:24px; background:linear-gradient(135deg,var(--pink),#ff6b4a);
+        box-shadow:0 4px 14px rgba(254,44,85,.45); cursor:pointer; z-index:60; }
+#fbBtn:active{ transform:scale(.94); }
+#fbWrap{ display:none; position:fixed; inset:0; z-index:70; }
+#fbWrap.show{ display:block; }
+#fbWrap .backdrop{ position:absolute; inset:0; background:rgba(0,0,0,.65); }
+#fbWrap .sheet{ position:absolute; left:0; right:0; bottom:0; background:var(--card); border:1px solid #2c2c36;
+                border-bottom:none; border-radius:18px 18px 0 0; padding:18px 18px calc(20px + env(safe-area-inset-bottom));
+                max-width:520px; margin:0 auto; max-height:88vh; overflow-y:auto; }
+#fbWrap .sheet h3{ font-size:17px; margin:0 0 6px; }
+#fbWrap .sheet p{ font-size:13px; color:var(--muted); line-height:1.7; margin:0 0 12px; }
+#fbWrap input[type=text]{ width:100%; background:#101016; border:1px solid #2c2c36; border-radius:12px;
+                          color:var(--text); font-size:14px; padding:12px; outline:none; margin-top:10px; }
+#fbWrap input[type=text]:focus{ border-color:var(--pink); }
+#fbWrap input[type=file]{ margin-top:8px; font-size:13px; color:var(--muted); }
+#fbWrap .flabel{ display:block; margin-top:10px; font-size:13px; color:var(--muted); }
+#fbWrap .row{ display:flex; gap:10px; margin-top:14px; }
+#fbWrap .btn-ghost{ flex:1; background:#2a2a34; border:none; border-radius:12px; font-size:15px; padding:13px 0; color:var(--text); cursor:pointer; }
+#fbWrap .btn-ok{ flex:2; border:none; border-radius:12px; font-size:15px; font-weight:600; padding:13px 0;
+                 color:#fff; cursor:pointer; background:linear-gradient(135deg,var(--pink),#ff6b4a); }
+#fbWrap .btn-ok:disabled{ opacity:.5; }
+#fbDone{ display:none; text-align:center; padding:20px 0 6px; }
+#fbDone .big{ font-size:40px; }
+#fbDone p{ margin-top:10px; }
+footer{ text-align:center; color:#55555f; font-size:11px; margin-top:30px; line-height:1.8; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span class="dy">YouTube</span> <span class="dl">无水印下载</span></h1>
+    <p>粘贴视频链接，一键保存无水印视频 / 音频</p>
+    <p style="font-size:12px;color:var(--muted)">本站已解析 <b id="parseCount" style="color:var(--pink)">-</b> 次</p>
+  </header>
+
+  <div class="card">
+    <textarea id="urlInput" placeholder="在此粘贴 YouTube 分享链接&#10;例如：https://www.youtube.com/watch?v=xxxx&#10;或 https://youtu.be/xxxx"></textarea>
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <button class="btn ghost" id="pasteBtn" style="margin-top:0;flex:1">📋 一键粘贴</button>
+      <button class="btn" id="parseBtn" style="margin-top:0;flex:2">开始解析</button>
+    </div>
+    <div id="tsParseWidget" style="margin-top:10px"></div>
+    <div class="hint">📋 在 YouTube App 点「分享」→「复制链接」，粘贴到这里即可<br>🌐 下载需要开 VPN（YouTube 直链走境外）<br>🔒 仅解析公开视频，请勿用于侵权用途</div>
+  </div>
+
+  <div class="loading" id="loading">解析中，请稍候…</div>
+  <div class="err" id="err"></div>
+
+  <div class="card" id="result">
+    <div class="title" id="resTitle"></div>
+    <div id="mediaBox"></div>
+    <div id="resList"></div>
+    <div class="hint" id="dlHint" style="display:none">iPhone 会弹出分享菜单，点「存储视频」即可保存到相册<br>💡 直链有时效，解析完尽快下载</div>
+  </div>
+
+  <footer>解析仅供个人学习交流<br>请勿传播他人原创作品</footer>
+</div>
+
+<!-- 反馈 -->
+<button id="fbBtn" title="问题反馈">💬</button>
+<div id="fbWrap">
+  <div class="backdrop" id="fbBackdrop"></div>
+  <div class="sheet" id="fbSheet">
+    <h3>问题反馈</h3>
+    <p>遇到解析失败、下载不了等问题？描述一下，可以附截图或录屏。</p>
+    <textarea id="fbMsg" placeholder="请描述你遇到的问题（比如：哪条链接解析失败、报了什么错）"></textarea>
+    <input type="text" id="fbContact" placeholder="联系方式（可选）" maxlength="120">
+    <label class="flabel" for="fbFiles">📎 截图/录屏（可选，最多3个，单个≤20MB）</label>
+    <input type="file" id="fbFiles" accept="image/*,video/*" multiple>
+    <div id="tsWidget" style="margin-top:10px"></div>
+    <div id="fbErr" style="display:none;color:#ff8ba0;font-size:13px;margin-top:10px;line-height:1.6"></div>
+    <div class="row">
+      <button class="btn-ghost" id="fbCancel">取消</button>
+      <button class="btn-ok" id="fbSubmit">提交反馈</button>
+    </div>
+    <div id="fbDone"><div class="big">✅</div><p>反馈已提交，谢谢！</p></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  var urlInput = $('urlInput'), parseBtn = $('parseBtn'), loading = $('loading'),
+      errBox = $('err'), resultBox = $('result'), mediaBox = $('mediaBox'),
+      resList = $('resList'), dlHint = $('dlHint');
+
+  // 一键粘贴：从剪贴板读取分享链接
+  $('pasteBtn').onclick = function(){
+    hideError();
+    if(navigator.clipboard && navigator.clipboard.readText){
+      navigator.clipboard.readText().then(function(t){
+        if(t && t.trim()){ urlInput.value = t.trim(); }
+        else showError('剪贴板是空的，请先去 YouTube App 复制分享链接');
+      }).catch(function(){
+        showError('无法读取剪贴板，请手动长按输入框粘贴（iPhone 请允许 Safari 访问剪贴板）');
+      });
+    } else {
+      showError('当前浏览器不支持一键粘贴，请手动长按输入框粘贴');
+    }
+  };
+
+  // YouTube 直链手机直接下载（需开 VPN），不走代理
+  function fileName(base, ext){
+    return 'youtube_' + String(base).replace(/[^\w\-]+/g, '_').slice(0, 40) + '.' + ext;
+  }
+  function showError(html){
+    errBox.style.display = 'block';
+    errBox.innerHTML = html;
+  }
+  function hideError(){ errBox.style.display = 'none'; errBox.innerHTML = ''; }
+  function setParseBtn(t, disabled){
+    parseBtn.textContent = t;
+    parseBtn.disabled = !!disabled;
+  }
+  function resetParseBtn(){ setParseBtn('开始解析', false); }
+
+  // 下载单个资源：手机直接请求直链（需开 VPN），成功则经系统分享保存（iPhone 弹出菜单）
+  function downloadResource(url, filename){
+    setParseBtn('正在准备下载…', true);
+    fetch(url, { referrerPolicy: 'no-referrer' }).then(function(res){
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      return res.blob();
+    }).then(function(blob){
+      var file = new File([blob], filename, { type: blob.type || 'video/mp4' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        resetParseBtn();
+        return navigator.share({ files: [file], title: filename }).catch(function(){});
+      }
+      var objUrl = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = objUrl; a.download = filename;
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(objUrl); }, 4000);
+      resetParseBtn();
+    }).catch(function(e){
+      resetParseBtn();
+      showError('下载失败：' + (e.message || '网络错误') +
+        '<br><br>💡 YouTube 直链需要境外网络，请确认 VPN 已开启（建议美国节点）。<br>💡 直链有时效，超时请重新解析。');
+    });
+  }
+
+  function resLabel(r, i){
+    var label = String(r.type || '');
+    if (/audio|m4a|mp3/i.test(label)) return '🎵 纯音频';
+    if (/2160|4k/i.test(label)) return '🎬 4K 超清';
+    if (/1440|2k/i.test(label)) return '🎬 2K 超清';
+    if (/1080/.test(label)) return '🎬 1080P 高清';
+    if (/720/.test(label)) return '🎬 720P 高清';
+    if (/480/.test(label)) return '🎬 480P';
+    if (/360/.test(label)) return '🎬 360P 流畅';
+    return '🎬 ' + (label || '视频') + ' #' + (i + 1);
+  }
+
+  function renderResult(d){
+    resultBox.style.display = 'block';
+    $('resTitle').textContent = d.title || '（无标题）';
+    mediaBox.innerHTML = '';
+    resList.innerHTML = '';
+    dlHint.style.display = 'none';
+
+    if (d.cover) {
+      var img = document.createElement('img');
+      img.src = d.cover;
+      img.style.cssText = 'width:100%;border-radius:12px;margin-bottom:4px;background:#000';
+      img.loading = 'lazy';
+      mediaBox.appendChild(img);
+    }
+
+    var resources = d.resources || [];
+    if (resources.length) {
+      var vids = resources.filter(function(r){ return !/audio|m4a|mp3/i.test(String(r.type || '')); });
+      var auds = resources.filter(function(r){ return /audio|m4a|mp3/i.test(String(r.type || '')); });
+      var ordered = vids.concat(auds);
+      ordered.forEach(function(r, i){
+        var btn = document.createElement('button');
+        btn.className = 'btn ghost';
+        btn.style.cssText = 'margin-top:10px;font-size:14px;font-weight:600';
+        var dur = r.duration ? ' · ' + Math.floor(r.duration / 60) + ':' + String(Math.floor(r.duration % 60)).padStart(2, '0') : '';
+        btn.textContent = '⬇ ' + resLabel(r, i) + dur;
+        btn.onclick = function(){
+          var ext = /audio|m4a/i.test(String(r.type || '')) ? 'm4a' : 'mp4';
+          downloadResource(r.url, fileName((d.title || 'youtube') + '_' + i, ext));
+        };
+        resList.appendChild(btn);
+      });
+      var tip = document.createElement('div');
+      tip.className = 'hint';
+      tip.textContent = '共 ' + ordered.length + ' 个版本，选择清晰度下载';
+      resList.appendChild(tip);
+      dlHint.style.display = 'block';
+    } else {
+      showError('解析成功但未找到可下载的媒体文件。');
+    }
+    resultBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  /* 解析区人机验证（与反馈共用一次脚本加载，重复引入会卡死组件） */
+  var _tsScriptPromise = null;
+  function ensureTurnstileScript(){
+    if (_tsScriptPromise) return _tsScriptPromise;
+    _tsScriptPromise = fetch('/api/turnstile-key').then(function(r){ return r.json(); }).then(function(j){
+      if (!j.ok || !j.siteKey) throw new Error('no site key');
+      return new Promise(function(resolve, reject){
+        if (window.turnstile) { resolve(j.siteKey); return; }
+        var s = document.createElement('script');
+        s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+        s.async = true; s.defer = true;
+        s.onload = function(){ resolve(j.siteKey); };
+        s.onerror = function(){ reject(new Error('script load failed')); };
+        document.head.appendChild(s);
+      });
+    });
+    return _tsScriptPromise;
+  }
+  var tsParseWidgetId = null;
+  ensureTurnstileScript().then(function(siteKey){
+    try {
+      tsParseWidgetId = turnstile.render('#tsParseWidget', { sitekey: siteKey, theme: 'dark', language: 'zh-cn' });
+    } catch(e){}
+  }).catch(function(){});
+
+    /* 反馈表单 */
+  var tsWidgetId = null;
+  function showFbError(html){
+    var e = $('fbErr');
+    e.style.display = 'block';
+    e.innerHTML = html;
+  }
+  function hideFbError(){
+    var e = $('fbErr');
+    e.style.display = 'none';
+    e.innerHTML = '';
+  }
+  function loadTurnstile(){
+    if (tsWidgetId !== null) return;
+    ensureTurnstileScript().then(function(siteKey){
+      // 等浏览器完成布局后再渲染：在 display:none 容器里渲染组件会直接卡死
+      requestAnimationFrame(function(){
+        setTimeout(function(){
+          try {
+            var el = document.getElementById('tsWidget');
+            if (el && el.offsetParent !== null) {
+              tsWidgetId = turnstile.render(el, { sitekey: siteKey, theme: 'dark', language: 'zh-cn' });
+            } else {
+              showFbError('验证组件加载失败，请关闭重试。');
+            }
+          } catch(e){
+            showFbError('验证组件加载失败，请关闭重试。');
+          }
+        }, 80);
+      });
+    }).catch(function(){
+      showFbError('验证组件加载失败，请检查网络后重试。');
+    });
+  }
+  $('fbBtn').onclick = function(){ $('fbWrap').classList.add('show'); $('fbDone').style.display = 'none'; hideFbError(); loadTurnstile(); };
+  $('fbBackdrop').onclick = function(){ $('fbWrap').classList.remove('show'); };
+  $('fbCancel').onclick = function(){ $('fbWrap').classList.remove('show'); };
+  $('fbSubmit').onclick = async function(){
+    hideFbError();
+    var msg = $('fbMsg').value.trim();
+    if(!msg){ showFbError('请先填写反馈内容。'); return; }
+    var files = Array.prototype.slice.call($('fbFiles').files || []);
+    if(files.length > 3){ showFbError('最多上传 3 个附件。'); return; }
+    for(var i = 0; i < files.length; i++){
+      var f = files[i];
+      if(!/^(image|video)\//.test(f.type || '')){ showFbError('只支持图片和视频附件。'); return; }
+      if(f.size > 20 * 1024 * 1024){ showFbError('单个附件不能超过 20MB。'); return; }
+    }
+    var tsToken = '';
+    if (tsWidgetId !== null) {
+      try { tsToken = turnstile.getResponse(tsWidgetId) || ''; } catch(e){}
+      if (!tsToken) { showFbError('请先完成人机验证。'); return; }
+    } else {
+      showFbError('验证组件未加载完成，请稍等几秒再试。');
+      return;
+    }
+    var btn = $('fbSubmit');
+    btn.disabled = true; btn.textContent = '提交中…';
+    try{
+      var fd = new FormData();
+      fd.append('message', msg);
+      fd.append('contact', $('fbContact').value.trim());
+      fd.append('page', location.href);
+      if (tsToken) fd.append('cf-turnstile-response', tsToken);
+      files.forEach(function(ff){ fd.append('files', ff, ff.name); });
+      const r = await fetch('/api/feedback', { method: 'POST', body: fd });
+      const j = await r.json();
+      if(j.ok){
+        $('fbMsg').value = ''; $('fbContact').value = ''; $('fbFiles').value = '';
+        $('fbDone').style.display = 'block';
+        setTimeout(function(){ $('fbWrap').classList.remove('show'); }, 1600);
+      } else {
+        showFbError('反馈提交失败：' + (j.error || '请稍后重试'));
+      }
+    }catch(e){ showFbError('网络错误，请稍后重试。'); }
+    if (tsWidgetId !== null) { try { turnstile.reset(tsWidgetId); } catch(e){} }
+    btn.disabled = false; btn.textContent = '提交反馈';
+  };
+
+  /* 本站解析次数 */
+  fetch('/api/stats').then(function(r){ return r.json(); }).then(function(j){
+    if (j.ok && typeof j.parseCount === 'number') $('parseCount').textContent = j.parseCount;
+  }).catch(function(){});
+
+  parseBtn.onclick = function(){
+    var text = urlInput.value.trim();
+    hideError();
+    resultBox.style.display = 'none';
+    if(!text){ showError('请先粘贴 YouTube 分享链接'); return; }
+    var tsToken = '';
+    if (tsParseWidgetId !== null) {
+      try { tsToken = turnstile.getResponse(tsParseWidgetId) || ''; } catch(e){}
+      if (!tsToken) { showError('请先完成人机验证'); return; }
+    }
+    setParseBtn('解析中…', true);
+    loading.style.display = 'block';
+    var apiUrl = '/api/parse?url=' + encodeURIComponent(text);
+    if (tsToken) apiUrl += '&turnstile=' + encodeURIComponent(tsToken);
+    fetch(apiUrl)
+      .then(function(r){ return r.text().then(function(t){
+        var ct = r.headers.get('content-type') || '';
+        if(!/json/i.test(ct)) throw new Error('服务异常（HTTP ' + r.status + '），请稍后重试');
+        return JSON.parse(t);
+      });})
+      .then(function(data){
+        loading.style.display = 'none';
+        resetParseBtn();
+        if (tsParseWidgetId !== null) { try { turnstile.reset(tsParseWidgetId); } catch(e){} }
+        if(!data.ok) throw new Error(data.error || '解析失败');
+        renderResult(data);
+        try {
+          var el = $('parseCount');
+          var n = parseInt(el.textContent, 10);
+          if (!isNaN(n)) el.textContent = n + 1;
+        } catch(e){}
+      })
+      .catch(function(e){
+        loading.style.display = 'none';
+        resetParseBtn();
+        if (tsParseWidgetId !== null) { try { turnstile.reset(tsParseWidgetId); } catch(e){} }
+        var msg = String(e.message || '解析失败');
+        if(/did not match the expected pattern|Unexpected token/i.test(msg))
+          msg = '服务暂时不可用，请稍后重试';
+        showError('解析失败：' + msg);
+      });
+  };
+})();
+</script>
+</body>
+</html>
