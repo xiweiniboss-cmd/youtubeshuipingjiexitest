@@ -369,6 +369,11 @@ async function handleFeedbackSubmit(request, env) {
     attachments,
     ua: (request.headers.get('user-agent') || '').slice(0, 200),
     ip: request.headers.get('cf-connecting-ip') || '',
+    geo: {
+      country: (request.cf && request.cf.country) || '',
+      region: (request.cf && request.cf.region) || '',
+      city: (request.cf && request.cf.city) || '',
+    },
     time: new Date().toISOString(),
   };
   await env.FEEDBACK_KV.put(id, JSON.stringify(record));
@@ -461,6 +466,13 @@ h1{font-size:20px;margin:8px 0 4px}h1 span{font-size:13px;color:#888;font-weight
 </div><script>
 const key = new URLSearchParams(location.search).get('key') || '';
 const esc = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const COUNTRY_ZH = {CN:'中国',US:'美国',JP:'日本',KR:'韩国',HK:'香港',TW:'台湾',MO:'澳门',SG:'新加坡',GB:'英国',DE:'德国',FR:'法国',IT:'意大利',ES:'西班牙',CA:'加拿大',AU:'澳大利亚',NZ:'新西兰',RU:'俄罗斯',IN:'印度',BR:'巴西',MX:'墨西哥',AR:'阿根廷',KR:'韩国',TH:'泰国',MY:'马来西亚',ID:'印度尼西亚',PH:'菲律宾',VN:'越南',TR:'土耳其',AE:'阿联酋',SA:'沙特',EG:'埃及',ZA:'南非',NL:'荷兰',SE:'瑞典',NO:'挪威',FI:'芬兰',DK:'丹麦',PL:'波兰',UA:'乌克兰',CH:'瑞士',AT:'奥地利',BE:'比利时',IE:'爱尔兰',PT:'葡萄牙',GR:'希腊',CZ:'捷克',HU:'匈牙利',RO:'罗马尼亚',IL:'以色列',KZ:'哈萨克斯坦'};
+function geoName(it){
+  const g = it.geo || {};
+  if(!g.country && !g.region && !g.city) return '';
+  const c = COUNTRY_ZH[g.country] || g.country || '';
+  return [c, g.region, g.city].filter(Boolean).join('·');
+}
 const siteName = (p) => {
   try {
     const h = new URL(p).hostname;
@@ -484,7 +496,7 @@ async function load() {
       const d = document.createElement('div');
       d.className = 'fb';
       const t = new Date(it.time).toLocaleString('zh-CN', { hour12: false });
-      d.innerHTML = '<div class="meta"><span class="site">[' + esc(siteName(it.page)) + ']</span> ' + esc(t) + (it.contact ? ' · ' + esc(it.contact) : '') + (it.ip ? ' · IP: ' + esc(it.ip) : '') + '</div>' +
+      d.innerHTML = '<div class="meta"><span class="site">[' + esc(siteName(it.page)) + ']</span> ' + esc(t) + (it.contact ? ' · ' + esc(it.contact) : '') + (it.ip ? ' · IP: ' + esc(it.ip) : '') + (geoName(it) ? ' (' + esc(geoName(it)) + ')' : '') + '</div>' +
         '<div class="msg">' + esc(it.message) + '</div>';
       const copyBtn = document.createElement('button');
       copyBtn.textContent = '📋 复制文本';
