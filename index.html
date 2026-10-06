@@ -63,6 +63,7 @@ footer{ text-align:center; color:#55555f; font-size:11px; margin-top:30px; line-
     <h1><span class="dy">YouTube</span> <span class="dl">无水印下载</span></h1>
     <p>粘贴视频链接，一键保存无水印视频 / 音频</p>
     <p style="font-size:12px;color:var(--muted)">本站已解析 <b id="parseCount" style="color:var(--pink)">-</b> 次</p>
+    <p style="font-size:12px;color:var(--muted)">今日还可解析 <b id="quotaCount" style="color:var(--pink)">-</b> 次</p>
   </header>
 
   <div class="card">
@@ -381,6 +382,7 @@ footer{ text-align:center; color:#55555f; font-size:11px; margin-top:30px; line-
           var n = parseInt(el.textContent, 10);
           if (!isNaN(n)) el.textContent = n + 1;
         } catch(e){}
+        try { refreshQuota(); } catch(e){}
       })
       .catch(function(e){
         loading.style.display = 'none';
@@ -393,6 +395,14 @@ footer{ text-align:center; color:#55555f; font-size:11px; margin-top:30px; line-
       });
   };
 })();
+
+// 每日解析配额显示
+function refreshQuota(){
+  fetch('/api/parse-quota').then(function(r){ return r.json(); }).then(function(j){
+    if (j.ok && typeof j.remaining === 'number') $('quotaCount').textContent = j.remaining;
+  }).catch(function(){});
+}
+refreshQuota();
 </script>
 </body>
 </html>
