@@ -529,6 +529,7 @@ const siteName = (p) => {
     if (h.includes('xiaohongshu')) return '小红书站';
     if (h.includes('douyin')) return '抖音站';
     if (h.includes('youtube')) return 'YouTube站';
+    if (h.includes('bilibili')) return 'B站站';
     return h;
   } catch { return ''; }
 };
@@ -623,7 +624,7 @@ h2{font-size:16px;margin:24px 0 12px;color:#f1f1f3}
 </style></head>
 <body><div class="wrap">
 <h1>📊 数据总览 <span id="time"></span></h1>
-<div class="sub">四站解析次数统计（仅成功计数）</div>
+<div class="sub">五站解析次数统计（仅成功计数）</div>
 <div class="grid" id="grid"><div class="err">加载中…</div></div>
 <div class="total" id="total" style="display:none"><div class="num" id="totalNum">0</div><div class="label">累计解析</div></div>
 
@@ -777,7 +778,7 @@ load();
 async function handleParseHistory(request, env) {
   const url = new URL(request.url);
   if (!checkAdminKey(url, env)) return json({ ok: false, error: '无权访问' }, 403);
-  const siteNames = { tiktok: 'TikTok站', xhs: '小红书站', douyin: '抖音站', youtube: 'YouTube站' };
+  const siteNames = { tiktok: 'TikTok站', xhs: '小红书站', douyin: '抖音站', youtube: 'YouTube站', bilibili: 'B站站' };
   const all = [];
   if (env.FEEDBACK_KV) {
     for (const site of Object.keys(siteNames)) {
@@ -797,12 +798,12 @@ async function handleGeoStats(request, env) {
   const url = new URL(request.url);
   if (!checkAdminKey(url, env)) return json({ ok: false, error: '无权访问' }, 403);
   const byCountry = {};
-  const bySite = { tiktok: {}, xhs: {}, douyin: {}, youtube: {} };
+  const bySite = { tiktok: {}, xhs: {}, douyin: {}, youtube: {}, bilibili: {} };
   if (env.FEEDBACK_KV) {
     try {
       const listed = await env.FEEDBACK_KV.list({ prefix: 'geoparse_' });
       for (const k of listed.keys) {
-        const m = k.name.match(/^geoparse_(tiktok|xhs|douyin|youtube)_([A-Z]{2})$/);
+        const m = k.name.match(/^geoparse_(tiktok|xhs|douyin|youtube|bilibili)_([A-Z]{2})$/);
         if (!m) continue;
         const n = Number((await env.FEEDBACK_KV.get(k.name)) || 0);
         if (!n) continue;
@@ -840,6 +841,7 @@ async function handleStatsAll(request, env) {
     { key: 'stats_parse_xhs', name: '小红书站' },
     { key: 'stats_parse_douyin', name: '抖音站' },
     { key: 'stats_parse_youtube', name: 'YouTube站' },
+    { key: 'stats_parse_bilibili', name: 'B站站' },
   ];
   const result = [];
   for (const s of sites) {
