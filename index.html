@@ -17,6 +17,10 @@ header p{ color:var(--muted); font-size:13px; margin:0; }
 .card{ background:var(--card); border-radius:16px; padding:18px 16px; margin-top:16px; box-shadow:0 4px 20px rgba(0,0,0,.35); }
 textarea{ width:100%; min-height:88px; background:#101016; border:1px solid #2c2c36; border-radius:12px; color:var(--text); font-size:14px; padding:12px; resize:vertical; outline:none; }
 textarea:focus{ border-color:var(--pink); }
+.dlprog{ display:none; margin-top:12px; }
+.dlprog .track{ height:10px; border-radius:6px; background:#2a2a34; overflow:hidden; }
+.dlprog .bar{ height:100%; width:0%; border-radius:6px; background:linear-gradient(90deg,var(--pink),#ff6b4a); transition:width .15s; }
+.dlprog .txt{ margin-top:6px; font-size:12px; color:var(--muted); text-align:center; }
 .btn{ display:block; width:100%; margin-top:12px; padding:14px; border:none; border-radius:12px; font-size:16px; font-weight:700; color:#fff; background:linear-gradient(135deg,var(--pink),#ff6b4a); cursor:pointer; }
 .btn:disabled{ opacity:.55; }
 .btn.ghost{ background:#2a2a34; margin-top:10px; font-size:14px; font-weight:500; }
@@ -83,6 +87,10 @@ footer{ text-align:center; color:#55555f; font-size:11px; margin-top:30px; line-
     <div class="title" id="resTitle"></div>
     <div id="mediaBox"></div>
     <div id="resList"></div>
+    <div class="dlprog" id="dlProg">
+      <div class="track"><div class="bar" id="dlProgBar"></div></div>
+      <div class="txt" id="dlProgTxt">准备下载…</div>
+    </div>
     <div class="hint" id="dlHint" style="display:none">iPhone 会弹出分享菜单，点「存储视频」即可保存到相册<br>💡 直链有时效，解析完尽快下载</div>
   </div>
 
@@ -160,13 +168,62 @@ var deviceId = (function(){
   function resetParseBtn(){ setParseBtn('开始解析', false); }
 
   // 下载单个资源：经 /api/ytdl 代理中转（googlevideo 无 CORS 头，手机直接 fetch 会被拦），成功则经系统分享保存
+  function fetchBlobProgress(url, onProgress){
+    return fetch(url).then(function(res){
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      var total = parseInt(res.headers.get('Content-Length') || '0', 10) || 0;
+      var ctype = res.headers.get('Content-Type') || 'video/mp4';
+      if(!res.body || !res.body.getReader) return res.blob();
+      var reader = res.body.getReader();
+      var chunks = [];
+      var received = 0;
+      onProgress(0, total);
+      function pump(){
+        return reader.read().then(function(r){
+          if(r.done){
+            try{ reader.releaseLock(); }catch(e){}
+            return new Blob(chunks, { type: ctype });
+          }
+          chunks.push(r.value);
+          received += r.value.byteLength || r.value.length || 0;
+          onProgress(received, total);
+          return pump();
+        });
+      }
+      return pump();
+    });
+  }
+  function fmtMB(b){ return (b/1048576).toFixed(1) + ' MB'; }
+  function setDlProg(received, total){
+    var wrap = document.getElementById('dlProg');
+    var bar = document.getElementById('dlProgBar');
+    var txt = document.getElementById('dlProgTxt');
+    wrap.style.display = 'block';
+    if(total > 0){
+      var pct = Math.min(100, Math.round(received / total * 100));
+      bar.style.width = pct + '%';
+      bar.style.opacity = '';
+      txt.textContent = '下载中 ' + pct + '%（' + fmtMB(received) + ' / ' + fmtMB(total) + '）';
+    }else{
+      bar.style.width = '100%';
+      bar.style.opacity = '.4';
+      txt.textContent = '下载中，已接收 ' + fmtMB(received) + '…';
+    }
+  }
+  function resetDlProg(){
+    var bar = document.getElementById('dlProgBar');
+    bar.style.width = '0%'; bar.style.opacity = '';
+    document.getElementById('dlProgTxt').textContent = '准备下载…';
+    document.getElementById('dlProg').style.display = 'block';
+  }
+  function hideDlProg(){ document.getElementById('dlProg').style.display = 'none'; }
+
   function downloadResource(url, filename){
     setParseBtn('正在准备下载…', true);
+    resetDlProg();
     var proxyUrl = '/api/ytdl?url=' + encodeURIComponent(url) + '&filename=' + encodeURIComponent(filename);
-    fetch(proxyUrl).then(function(res){
-      if(!res.ok) throw new Error('HTTP ' + res.status);
-      return res.blob();
-    }).then(function(blob){
+    fetchBlobProgress(proxyUrl, setDlProg).then(function(blob){
+      hideDlProg();
       var file = new File([blob], filename, { type: blob.type || 'video/mp4' });
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         resetParseBtn();
@@ -178,8 +235,10 @@ var deviceId = (function(){
       document.body.appendChild(a); a.click();
       setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(objUrl); }, 4000);
       resetParseBtn();
+      hideDlProg();
     }).catch(function(e){
       resetParseBtn();
+      hideDlProg();
       showError('下载失败：' + (e.message || '网络错误') +
         '<br><br>💡 可点右侧「🔗 复制直链」粘贴到 Safari 直接打开播放。<br>💡 直链有时效，超时请重新解析。');
     });
@@ -414,7 +473,10 @@ function refreshQuota(){
   var el = document.getElementById('quotaCount');
   if (!el) return;
   var qurl = '/api/parse-quota';
-  try { if (typeof deviceId !== 'undefined' && deviceId) qurl += '?deviceId=' + encodeURIComponent(deviceId); } catch(e){}
+  try {
+    var did = localStorage.getItem('device_id');
+    if (did) qurl += '?deviceId=' + encodeURIComponent(did);
+  } catch(e){}
   fetch(qurl).then(function(r){ return r.json(); }).then(function(j){
     if (j && j.ok && typeof j.remaining === 'number') el.textContent = j.remaining;
   }).catch(function(){});
