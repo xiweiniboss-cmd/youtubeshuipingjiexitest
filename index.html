@@ -102,6 +102,23 @@ header.topbar{ display:flex; align-items:center; gap:12px; text-align:left; marg
 .step .t{ font-size:12.5px; font-weight:700; margin-top:6px; }
 .step .d{ font-size:11px; color:var(--faint); margin-top:3px; line-height:1.5; }
 </style>
+<style>
+/* ===== 全屏品牌渐变背景（第三轮） ===== */
+html, body{ background:#991b1b; }
+.bg{ background:linear-gradient(155deg, #FF1E1E 0%, #C81E1E 55%, #7F1D1D 105%); }
+.orb{ background:radial-gradient(circle at 40% 40%, rgba(255,255,255,.55), rgba(255,255,255,0) 70%); opacity:.16; }
+.card{ background:rgba(13,13,20,.45); }
+.step{ background:rgba(13,13,20,.30); }
+.quota-chip{ background:rgba(13,13,20,.30); }
+header.topbar, .hero h1{ text-shadow:0 2px 18px rgba(0,0,0,.30); }
+.hero p, .brand-sub{ text-shadow:0 1px 10px rgba(0,0,0,.28); }
+footer{ text-shadow:0 1px 8px rgba(0,0,0,.30); }
+</style>
+
+<style>
+/* ===== 背景层级修正（第四轮）：body 改透明，品牌渐变层真正显示 ===== */
+body{ background:transparent; }
+</style>
 </head>
 <body>
 <div class="bg"><div class="orb orb-a"></div><div class="orb orb-b"></div><div class="orb orb-c"></div></div><div class="grain"></div>
